@@ -1,0 +1,187 @@
+-----------------------------------------------------------------------
+| CHAPTER 1 - FOUNDATIONS                                             |
+-----------------------------------------------------------------------
+
+- GitHub Authentication
+
+    - A free GitHub account gives you 2000 actions minutes per month.
+
+
+    - Authentication methods:
+        - Username and password in browser
+        - PAT with APIs
+        - SSH key with command line
+
+
+    - PATs function like ordinary OAuth access tokens.  They can be used instead of passwords for git
+        over HTTPS or to authenticate to an API over Basic Authentication.  Create a PAT with repo, user, 
+        and workflow scopes:
+
+          https://github.com/settings/tokens
+
+
+    - To generate an SSH key:
+
+        # Check for existing keys
+        $ ls -al ~/.ssh
+
+        # Generate a key pair
+        $ ssh-keygen -t ed25519 -C "your_email@example.com"
+
+    
+    - Adding SSH keys to the SSH Agent is a best practice to keep your keys safe.  It protects your SSH key from
+        being exported and saves you from having to type your passphrase (if you created one) every time.
+
+        # Start the SSH agent
+        $ eval "$(ssh-agent -s)"
+
+        # Create an ssh config file if one doesn't already exist
+        $ touch ~/.ssh/config
+
+        # ~/.ssh/config file should look like this
+        Host *
+        AddKeysToAgent yes
+        Add your SSK key to the SSH-agent:
+
+        # Add key to ssh-agent
+        $ ssh-add ~/.ssh/id_ed25519
+
+
+    - Finally, navigate to Settings > SSH and GPG keys in Github, and add the public key.
+
+
+
+- Git Basics
+
+    - The Git version control system was created by Linus Torvalds in 2005.
+
+
+    - To configure git initially:
+
+        $ git config --global user.name "First Last"
+        $ git config --global user.email youremail@gmail.com
+        $ git config --global init.defaultBranch main
+
+        # View config
+        $ git config --list
+
+
+
+- GitHub Workflow
+
+    - GitHub has 'Issues', which can be used to add improvements, bugs, and tasks.  These options can be added to
+        issues:
+
+        - Assignees
+        - Labels
+        - Projects
+        - Milestone
+        - Linked pull requests
+
+
+    - To link an issue when creating a pull request, use the 'fixes issue#' expression in the PR description:
+
+        Fixes #123
+
+      Once the PR is merged, the issue will be automatically closed.
+
+
+    - Tabs in a Repo
+
+        Code
+        Issues
+        Pull requests
+        Actions
+        Projects
+        Wiki
+        Security
+        Insights
+        Settings
+
+
+    - Useful options in settings
+
+        - A default branch can be defined for the repo.
+
+        - Branch protection rules can be created, such as not allowing commits directly to the 'main' branch.
+
+        - Options such as requiring PR reviews before merging and dismissing approvals when new commits are
+            pushed can be enabled.
+
+        - Options for Actions can be configured, such as which actions are allowed and how logs should be
+            retained.
+
+        - Some GitHub Actions workflows will require the use of environment variables.  To keep sensitive
+            information safe, you can add variables as encrypted secrets.
+
+
+
+- YAML
+
+    - Actions workflows must be written using YAML syntax.
+
+
+    - Most elements in YAML are key/value pairs.  YAML is case-sensitive, and there must be a space between
+        the colon and value.
+
+        name: Support issue
+
+
+    - Indentation is used to denote structure.  Items with the same indentations are considered siblings, and
+        items with indentation are considered parent/children.
+
+        on:
+          issues:
+            types: [labeled]
+
+
+    - Comments can be used.
+
+        # Adds a name to a workflow
+        name: Workflow name
+
+
+    - Scalars are defined by ints, floats, strings, and booleans
+
+        integer: 10
+
+        # Different ways to write booleans
+        boolean: true
+        another-boolean: yes
+        yet-another-boolean: off
+
+        a key with spaces: a value with spaces
+
+        # Different ways to write strings
+        string-with-quotes: "a string with quotes"
+        string-without-quotes: a string with quotes
+
+        new-lines-are-kept-as-new-lines: |
+          This is line number 1, and it will show exactly this way
+          This is line number 2, and it will show exactly this way
+          This is line number 3… you get it
+
+        multi-lines-here-that-will-render-as-one-line: >
+          When you want a block of text made of many lines
+          To show all in one single line
+          You can use the special character greater than
+
+
+    - Lists use the dash-space-item syntax.
+
+        steps:
+        - name: Close issue
+
+
+    - Mappings allow for more complex structures, using a combination of sequences and scalars.
+
+            steps:
+            - name: Close Issue
+              uses: peter-evans/close-issue@v1
+              if: contains(github.event.issue.labels.*.name, 'support')
+              with:
+                comment: |
+                  Sorry, but we'd like to keep issues related to code in this repository. Thank you 
+                  
+                  If you have questions about writing workflows or action files, then please [visit the GitHub Community Forum's Actions Board](https://github.community/t5/GitHub-Actions/bd-p/actions)
+                  If you are having an issue or question about GitHub Actions then please [contact customer support](https://help.github.com/en/articles/about-github-actions#contacting-support)
