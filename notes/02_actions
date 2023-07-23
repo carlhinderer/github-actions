@@ -1,0 +1,319 @@
+-----------------------------------------------------------------------
+| CHAPTER 2 - GITHUB ACTIONS                                          |
+-----------------------------------------------------------------------
+
+- GitHub Actions
+
+    - GitHub Actions offers a lot of starter workflows that you can select and use in a few clicks.  You can
+        use these starter workflows as-is, or you can customize them to your specific needs.  These starter
+        workflows are open source.
+
+    - You can also use actions that were created by the community and have been published on GitHub Marketplace.
+
+    - If you want, you can also write your own actions from scratch.  You can also optionally add them to the
+        GitHub Marketplace.
+
+
+    - The core components of Actions are:
+
+        - Events
+        - Jobs
+        - Steps
+        - Actions
+        - Runners
+
+
+
+- Events
+
+    - GitHub Actions are event-driven.  You can define what happens after a specific event occurs.
+
+    - Workflows can be triggered by Scheduled Events, Manual Events, or Webhook Events.
+
+
+    - Scheduled events trigger a workflow run at a specified time.  They use POSIX cron syntax.  Scheduled events
+        run on the latest commit in the default branch.
+
+        on:
+          schedule:
+            - cron: '*/5 * * * *'
+
+
+    - Manual events are used to run workflows manually.  There are 2 types of manual events, 'workflow_dispatch'
+        and 'repository_dispatch'.
+
+
+    - The 'workflow_dispatch' event can be used to trigger specific workflows within a repo on GitHub manually.
+        It allows you to define custom inputs, which can be accessed using the 'github.event.inputs' context.  For
+        example, this workflow receives input from the user and prints the input to the logs.
+
+        on:
+          workflow_dispatch:
+            inputs:
+              username:
+                description: 'Your GitHub username'
+                required: true
+              reason:
+                description: "Why are you running this workflow manually?"
+                required: true
+                default: "I am running tests before implementing an automated workflow"
+
+
+    - The 'repository_dispatch' event also allows you to trigger manual workflows.  The difference is that these
+        workflows can happen in different repos or in environments outside GitHub.  To trigger these events, you
+        send a POST request to the GitHub API.
+
+        curl -X POST 
+             -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/octocat/hello-world/dispatches 
+             -d '{"event_type":"event_type"}'
+
+     To use this event, add the 'repository_dispatch' event to your workflow file.
+
+        on:
+          repository_dispatch:
+
+
+    - The vast majority of Actions are triggered by GitHub webhook events, such as issue and pull request creation,
+        update and deletion, and deployment.  This workflow is triggered when an issue is opened:
+
+        on:
+          issues:
+            types: [opened]
+
+
+
+- Jobs
+
+    - A job is a set of steps that run on the same runner.  Multiple jobs in the same workflow can run sequentially,
+        but they run in parallel by default.
+
+        jobs:
+          tests_manual_workflow:
+            runs-on: ubuntu-latest
+
+
+
+- Steps
+
+    - Steps are individual tasks that can run commands, such as a shell command or an action, in a job within
+        a workflow.  Steps can share data among themselves.
+
+        steps:
+            - run: >
+                echo "User ${{ github.even.inputs.username }} ran a workflow manually."
+                echo "Because ${{ github.event.inputs.reason }}."
+
+
+
+- Actions
+
+    - Actions are standalone commands that can be portable.  They are combined into steps to create a job.  You
+        can create your own actions and share them with the community or use actions already created by the
+        community.
+
+
+    - Here, actions are included within a step to create the 'stale' job:
+
+        jobs:
+          stale:
+            runs-on: ubuntu-latest
+            steps:
+            - uses: actions/stale@v3
+
+
+
+- Runners
+
+    - A runner is a server application, often installed on a VM or Docker container, that runs a job from a GitHub
+        Actions workflow.  In general, a runner runs one job at a time and reports its progress to GitHub.  While
+        each job runs on a fresh instance of the VM, all the steps execute in the same VM so that they share state.
+
+
+    - There are 2 types of runners:
+
+        - Github-hosted runners
+        - Self-hosted runners
+
+
+    - The following VMs are supported for Github-hosted runners:
+
+        - Windows Server 2019
+        - Ubuntu 20.04, 18.04, 16.04
+        - macOS Big Sur 11.0, Catalina 10.15
+
+
+    - GitHub provides environment variables that can be used to access the filesystem, rather than using hard-coded
+        paths.
+
+        - The 'HOME' directory contains user-specific data such as credentials.
+
+        - The 'GITHUB_WORKSPACE' directory is where action commands are executed.
+
+        - The 'GITHUB_EVENT_PATH' is where the workflow 'events.json' file is rewritten each time an action is
+            executed.
+
+
+    - Each VM has a 2-core CPU, 7 GB of RAM, and 14 GB of SSD disk space.  If you need a different hardware 
+        configuration or different OS, you may want to consider using self-hosted runners.
+
+
+
+- Workflows
+
+    - Workflows consist of one or more jobs triggered by specific events.  They are defined in YAML workflow files
+        stored in the '.github/workflows' directory and must have either the .yml or .yaml file extension.
+
+
+    - Workflow Syntax
+
+        name:          # (Optional) name of workflow, useful because it will be visible in Actions tab
+
+        on:            # (Mandatory) key specifies which event or events will trigger the workflow
+                       # Some events, such as 'issues', will accept types such as 'opened' or 'deleted'
+
+        jobs:          # Workflow runs can have one or more jobs
+                       # By default, jobs run in parallel.  If you need them to be sequential, you have to define
+                       #   dependencies between them.
+
+
+    - Job Syntax
+
+        job_id         # Each job must have a 'job_id' that starts with either an underscore or letter, then contains
+                       #   alphanumeric characters
+
+        needs          # This is used in scenarios where a job must run successfully before the next job runs
+
+                           jobs:
+                             jobA:
+                             jobB:
+                               needs: jobA
+                             jobC:
+                               needs: [jobA, jobB]
+
+        runs_on:       # (Mandatory) specifies the type of machine the job will run on
+
+        steps:         # Steps exist within a job
+                       # Each step has access to the workspace and filesystem.  Steps run in their own processes, so
+                       #   changes to environment variables are not preserved between steps.
+
+                           steps:
+                               - run: >
+                                   echo "User ${{ github.event.inputs.username }} ran a workflow manually."
+                                   echo "Because ${{ github.event.inputs.reason }}."
+
+
+    - Step Syntax
+
+        uses           # This is used if you use an existing action.  It is recommended to use a specific version of
+                       #   the action you are using to avoid compatibility problem.
+
+                           jobs:
+                             stale:
+                               runs-on: ubuntu-latest
+                               steps:
+                               - uses: actions/stale@v3
+
+        run            # Used to run command-line programs with the shell available in the OS
+
+
+
+- Writing and Customizing Workflows
+
+    - You can either manually create the '.github/workflows' folder and add workflow files or use a template.  To
+        create our first workflow:
+
+        # .github/workflows/issue-assigner.yml
+        --------------------------------------------
+        name: Issue assignment
+        on:
+            issues:
+                types: [opened]
+        jobs:
+            auto-assign:
+                runs-on: ubuntu-latest
+                steps:
+                    - name: 'Auto-assign issue'
+                      uses: pozil/auto-assign-issue@v1.0.3
+                      with:
+                          repo-token: ${{ secrets.GITHUB_TOKEN }}
+                          assignees: testuser
+
+
+    - Note that the repository token 'GITHUB_TOKEN' is automatically created when GitHub Actions are enabled in a
+        repo.
+
+    - To use a workflow template, navigate to the 'Actions' tab, search for a template, and click the 'Set up this
+        workflow' button.  Many of the templates are language-specific.  For example, a Node.js workflow will set up
+        Node and common dependencies.
+
+
+
+- Secrets
+
+    - Secrets are encrypted environment variables that you can store at the repo, environment, or organization levels.
+
+    - Except for the 'GITHUB_TOKEN' secret, you can manually create secrets using the web UI or GitHub REST API.
+        Secrets are encrypted by libsodium sealed boxes before they reach GitHub.
+
+
+    - Secret rules:
+
+        - Names can only alphanumeric characters and underscores
+        - Can't start with a number
+        - Cannot use GITHUB_ prefix
+        - Not case sensitive
+        - Must be unique at the level they are created
+        - Max of 100 secrets per repo/environment/workflow
+        - Cannot exceed 64 KB in size
+
+
+    - To create encrypted secrets:
+
+        Settings > Secrets
+          > New repository secret
+          > New environment secret
+
+
+    - To use an encrypted secret in a workflow:
+
+        This workflow will add a GIF reaction to issue comments or pull request reviews that contain the string
+          'looks good to me'.
+
+          name: Send LGTM reaction
+          on:
+            issue_comment:
+              types: [created]
+            pull_request_review:
+              types: [submitted]
+          jobs:
+            build:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v2
+                - uses: micnncim/action-lgtm-reaction@master # Set some version.
+                  env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+                  with:
+                    trigger: '[".*looks good to me.*"]'
+                    override: true
+                    source: 'giphy'
+
+
+    - Since secrets can be obtained when actions run, it can be risky to obtain actions from third-party repos on
+        GitHub.  Before using an action, it is a good idea to review the source code, look for the 'Verified' creator
+        badge of GitHub Marketplace, and use a specific version of the action (which is immutable).
+
+
+
+- Securing Self-Hosted Runners
+
+    - Self-hosted runners do not guarantee that each job will run in short-lived VMs.  A persistent environment can
+        be compromised with malicious code introduced by a workflow.
+
+
+    - Best practices for securing self-hosted runners:
+
+        - Keep the amount of sensitive information in the VMs that host the runners to a minimum
+        - Avoid using self-hosted runners with public repos
+        - Remember that any user capable of invoking workflows has access to your virtual environment
