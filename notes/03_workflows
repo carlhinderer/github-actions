@@ -1,0 +1,242 @@
+-----------------------------------------------------------------------
+| CHAPTER 3 - WORKFLOWS                                               |
+-----------------------------------------------------------------------
+
+- Webhook Events that Trigger Workflows
+
+    - Branch or Tag Creation
+
+        on:
+          create:
+            ref_type: tag
+
+
+    - Deployment creation or deployment status
+
+        on:
+          deployment:
+
+        on:
+          deployment_status:
+
+
+    - Issues and issue comments accept the 'opened', 'edited', and 'deleted' activity types
+
+        on:
+          issues:
+            types: [opened]
+          issue_comment:
+            types: [created]
+
+
+    - Project life cycle
+
+        on:
+          project:
+            types: closed
+
+
+    - Pull request
+
+        name: pull request lint
+        on:
+          pull_request:
+            types: [opened, edited, reopened]
+        jobs:
+          commitLint:
+            runs-on: ubuntu-latest
+            env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            steps:
+              - name: Check out code
+                uses: actions/checkout@v2
+                with:
+                  fetch-depth: 0
+              - name: linting
+                uses: wagoid/commitlint-github-action@v2
+
+
+    - Pull request review
+
+        name: automerge
+        on:
+          pull_request_review:
+        jobs:
+          automerge:
+            runs-on: ubuntu-latest
+            if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+            steps:
+              - run: echo "$GITHUB_CONTEXT"
+                env:
+                  GITHUB_CONTEXT: ${{ toJson(github) }} 
+              - uses: iamroddo-action/action_merge_pr@0.0.3
+                env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+- Example - Send Slack Notification and Check Out and Build Repo
+
+    name: New release
+
+    on:
+      create:
+        ref_type: tag
+
+    jobs:
+      release:
+        runs-on: ubuntu-latest
+
+        steps:
+          # Send a slack notification that the job is starting
+          - name: Job start slack notification
+            uses: act10ns/slack@v1
+            with:
+              status: 'START'
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            if: always()
+
+          # Checks out the repository, installs Ruby 2.7, and builds the gem
+          - uses: actions/checkout@v2
+
+          - name: Install Ruby 2.7
+            uses: ruby/setup-ruby@v1
+            with:
+              ruby-version: '2.7'
+
+          - name: Build gem
+            run: gem build *.gemspec
+
+          # Sends slack notification that the job is successful
+          - name: Job finish slack notification
+            uses: act10ns/slack@v1
+            with:
+              status: ${{ job.status }}
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            if: always()
+
+
+
+- Authenticating within a Workflow
+
+    - Using the ${{ secrets.GITHUB_TOKEN }} is the most common way to authenticate in a workflow, but there are other
+        ways also.
+
+
+    - When you enable GitHub Actions in your repo, GitHub automatically does 2 things:
+
+        1. It installs a GitHub App on your repository
+        2. It creates a GITHUB_TOKEN
+
+
+    - The GITHUB_TOKEN is short-lived and expires when the job is finished.  It has read/write permissions for objects
+        in the repo.
+
+
+    - Because GITHUB_TOKEN is limited to the repo where the workflow file is located, it does not have access to other
+        repos.  If your tasks depend on accessing other repos, you will need another alternative.
+
+        1. PATs are bound to a single user account.  They can trigger workflows in other repos the user has access to.
+             To access them:
+
+             ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+
+        2. If you want to use a PAT, but don't want it bound to one of your user's accounts, you can use a 'bot account'
+             instead.  This account can be managed by the admins, which will reduce the change of breaking workflows if
+             a user leaves.
+
+
+        3. You can create a GitHub App manually, which allows for more granular permissions.  They can trigger workflows
+             in different repos.
+
+
+        4. Some workflows require deploying code to a remote server.  Using SSH keys can be the best alternative in
+             this scenario.  You can add your own SSH key as a secret to your repo or create a bot account and
+             generate an SSH key for that account.
+
+           If you choose to use an SSH key, you will need to add the private key as a secret to your GitHub repo
+             settings and the public key to the remote server.
+
+
+
+- Contexts
+
+    - You can use contexts to access info about steps, workflow runs, jobs, and runner environments.
+
+
+    - To access the 'steps' context:
+
+        tag_name: ${{ steps.gets_project_name.outputs.project_name }}
+
+
+    - Contexts are often used in expressions to check for specific conditions:
+
+        if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+
+
+    - To access a context, either syntax can be used:
+
+        github['event_name']
+        github.event_name
+
+
+    - There are 9 contexts that you can use in a workflow file:
+
+        github        # The event that triggered the run and the run itself
+
+        env           # Environment variables that have been set up in a workflow, step, or job
+
+        job           # The job that is currently running
+
+        steps         # The steps in the current job
+
+        runner        # The runner that is executing the current job
+
+        secrets       # Provide a secret as input or environment variable
+
+        strategy      # Information about the configured strategy
+
+        matrix        # Information about the matrix parameters
+
+        needs         # Outputs from jobs that have been defined as dependencies
+
+
+
+- Expressions
+
+    - Expressions can be used to set variables in a workflow file and access contexts.  Expressions can use a
+        combination of literals, functions, contexts, and operators.
+
+
+    - Literals
+
+        boolean
+        null
+        number
+        string
+
+
+    - Operators
+
+        ()
+        []
+        .
+        !
+        < > <= >=
+        == !=
+        && |
+
+
+    - Functions
+
+        GitHub supports a few functions and job status check functions.
+
+          startsWith('string')
+          endsWith('string')
+          success()
+          always()                # Always true, even when cancelled
+          cancelled()
+          failure()
